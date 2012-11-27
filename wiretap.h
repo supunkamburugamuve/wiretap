@@ -28,11 +28,6 @@ struct arpheader {
     unsigned char __ar_tip[4];          /* Target IP address.  */
 };
 
-struct tcpopts {
-//    u_long options;
-    uint8_t options;
-};
-
 // struct to hold map item info
 typedef struct map_item {
     char key[40];

@@ -208,7 +208,6 @@ void callback_handler(u_char *user, const struct pcap_pkthdr *pcap_hdr, const u_
     const struct arpheader* arp_hdr;
     const struct tcphdr* tcp_hdr;
     const struct udphdr* udp_hdr;
-    //const struct tcpopts* tcp_opts_hdr;
     struct icmp* icmp_hdr;
     char src_ip[INET_ADDRSTRLEN];
     char dst_ip[INET_ADDRSTRLEN];
@@ -265,24 +264,21 @@ void callback_handler(u_char *user, const struct pcap_pkthdr *pcap_hdr, const u_
             add_to_map(&tcp_flag_info.info_map, flag_key);
             tcp_flag_info.pkt_count++;
 
-            // TODO : fix options
+            // read options
             if (tcp_hdr->th_off * 4 > 20) {
                 int end = 0;
                 int off = 0;
                 int one = 0;
                 while (!end) {
-                    char *p = (packet + sizeof(struct ether_header) + sizeof(struct ip) + sizeof(struct tcphdr) + off);
+                    char *p = (char*)(packet + sizeof(struct ether_header) + sizeof(struct ip) + sizeof(struct tcphdr) + off);
                     // if we encounter 0 that means end of options
                     if (p[0] == 0) {
                         end = 1;
-                        // printf("end of options..........\n");
                     } else {
                         if (p[0] != 1) {
                             add_to_int_map(&tcp_opt_info.info_map, (int)p[0]);
-                            // printf("found option %d, with length %d...\n", p[0], p[1]);
                             off += (int)p[1];
                         } else {
-                            // printf("found option %d...\n", p[0]);
                             off += 1;
                             if (!one) {
                                 add_to_int_map(&tcp_opt_info.info_map, (int)p[0]);

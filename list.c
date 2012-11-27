@@ -37,7 +37,6 @@ void list_unlock(list_t *l) {
 
 void list_insert(list_t *l, void *data) {
     /* Iterate through the list till we encounter the last node. */
-
     node_t *node = create_node();
     node->val = data;
     if (l->tail) {
