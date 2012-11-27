@@ -158,7 +158,7 @@ int main(int argc, char **argv) {
     printf("\n---------- TCP Flags ----------\n\n");
     print_map(&tcp_flag_info, 0);
     printf("\n---------- TCP Options ----------\n\n");
-    print_int_map(&tcp_opt_info, 0);
+    print_map(&tcp_opt_info, 0);
     printf("\n========== Transport Layer : UDP ==========\n");
     printf("\n--- Source UDP Ports ---\n\n");
     print_int_map(&src_udp_ports_info, 0);
@@ -269,6 +269,7 @@ void callback_handler(u_char *user, const struct pcap_pkthdr *pcap_hdr, const u_
                 int end = 0;
                 int off = 0;
                 int one = 0;
+                char opt1[5], opt2[5];
                 while (!end) {
                     char *p = (char*)(packet + sizeof(struct ether_header) + sizeof(struct ip) + sizeof(struct tcphdr) + off);
                     // if we encounter 0 that means end of options
@@ -276,12 +277,14 @@ void callback_handler(u_char *user, const struct pcap_pkthdr *pcap_hdr, const u_
                         end = 1;
                     } else {
                         if (p[0] != 1) {
-                            add_to_int_map(&tcp_opt_info.info_map, (int)p[0]);
+                            sprintf(opt1, "%#.2x", (int)p[0]);
+                            add_to_map(&tcp_opt_info.info_map, opt1);
                             off += (int)p[1];
                         } else {
                             off += 1;
                             if (!one) {
-                                add_to_int_map(&tcp_opt_info.info_map, (int)p[0]);
+                                sprintf(opt2, "%#.2x", (int)p[0]);
+                                add_to_map(&tcp_opt_info.info_map, opt2);
                             }
                             one = 1;
                         }
@@ -439,7 +442,7 @@ void add_to_map(list_t *list, char *key) {
 // prints the key, value pairs in the given list
 void print_map(pkt_info_t *info, int tab) {
     node_t *n = info->info_map.head;
-    if (info->pkt_count == 0)
+    if (info->pkt_count == 0 || n == NULL)
         printf("\t(no results)\n");
     map_item_t *item;
     float percent;
@@ -487,7 +490,7 @@ void add_to_int_map(list_t *list, int key) {
 // prints the key, value pairs in the given integer key map
 void print_int_map(pkt_info_t *info, int tab) {
     node_t *n = info->info_map.head;
-    if (info->pkt_count == 0)
+    if (info->pkt_count == 0 || n == NULL)
         printf("\t(no results)\n");
     map_item_int_t *item;
     float percent;
