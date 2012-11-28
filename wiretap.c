@@ -100,17 +100,17 @@ int main(int argc, char **argv) {
     pcap_p = pcap_open_offline(argv[1], errorbuf);
     if (pcap_p == NULL) {
         printf("Error while opening dump file.\n%s\n", errorbuf);
-        return -1;
+        exit(0);
     }
     // check whether the link layer type is Ethernet, return otherwise
     if (pcap_datalink(pcap_p) != DLT_EN10MB) {
         printf("Dump file provided is not captured from Ethernet.\n");
-        return -1;
+        exit(0);
     }    
     // read all packets from dump file 
     if (pcap_loop(pcap_p, 0, callback_handler, NULL) == -1) {
         printf("Error while reading dump file.\n");
-        return -1;
+        exit(0);
     }
     // close the pcap file
     pcap_close(pcap_p);       
