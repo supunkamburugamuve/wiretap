@@ -63,6 +63,7 @@ void list_remove(list_t *l, node_t *node);
 
 void list_unlock(list_t *list);
 void list_lock(list_t *l);
+void list_destroy(list_t *list);
 
 // struct to hold info gathered from different packets
 typedef struct pkt_info {

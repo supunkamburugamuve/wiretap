@@ -6,6 +6,12 @@
 /*
     Wiretap is an offline pcap dump file reader which takes a dump file as the
     input and extracts out all packet data and prints in a human readable form.
+
+    Here we maintain maps for each category of data extracted. In each map, key
+    is an item in the particular category and value is a counter. For example
+    in the source ip map, key is an ip address and the value is the number of
+    times that ip address appeared in packets. So we fill these maps while we
+    read packets and print results at the end.
 */
 
 void callback_handler(u_char *user, const struct pcap_pkthdr *pcap_hdr, const u_char *packet);
@@ -19,6 +25,10 @@ void add_to_int_map(list_t *list, int key);
 void print_int_map(pkt_info_t *info, int tab);
 void process_tcp_flags(char *buf, u_char th_flags);
 void process_icmp_response(int type, int code, char *buf);
+void print_results();
+void init_lists();
+void free_lists();
+void free_list(list_t *list);
 
 // set of global variables to summarize packet information
 int pkt_cnt;
@@ -70,38 +80,21 @@ pkt_info_t icmp_cat_info;
 int main(int argc, char **argv) {
     // check options passed
     if (argc != 2) {
-        printf("Invalid argument list. Please use '--help' for usage\n");
+        printf("\nInvalid argument list. Please use '--help' for usage.\n\n");
         return -1;
     }
     // print help 
     if (strcmp("--help", argv[1]) == 0) {
         printf("\nUsage : %s <dump file name>\n", argv[0]);
         printf("\tEx : %s traceroute.pcap\n\n", argv[0]);
+        exit(0);
     }
     // pcap file pointer
     pcap_t *pcap_p;
     // error buffer to hold errors on pcap call
     char errorbuf[PCAP_ERRBUF_SIZE];
-    // initialize lists
-    list_init(&src_eth_info.info_map);
-    list_init(&dst_eth_info.info_map);
-    list_init(&nw_prot_info.info_map);
-    list_init(&src_ip_info.info_map);
-    list_init(&dst_ip_info.info_map);
-    list_init(&ttl_info.info_map);
-    list_init(&arp_info.info_map);
-    list_init(&trns_prot_info.info_map);
-    list_init(&src_tcp_ports_info.info_map);
-    list_init(&dst_tcp_ports_info.info_map);
-    list_init(&tcp_flag_info.info_map);
-    list_init(&tcp_opt_info.info_map);
-    list_init(&src_udp_ports_info.info_map);
-    list_init(&dst_udp_ports_info.info_map);
-    list_init(&icmp_src_ip_info.info_map);
-    list_init(&icmp_dst_ip_info.info_map);
-    list_init(&icmp_type_info.info_map);
-    list_init(&icmp_code_info.info_map);
-    list_init(&icmp_cat_info.info_map);
+    // initialize all lists used
+    init_lists();
 
     // open dump file
     pcap_p = pcap_open_offline(argv[1], errorbuf);
@@ -121,60 +114,10 @@ int main(int argc, char **argv) {
     }
     // close the pcap file
     pcap_close(pcap_p);       
-
-    // print results
-    printf("=============== Summary ===============\n\n");
-    print_date(&start_ts);
-    print_time_diff(&start_ts, &end_ts);
-    printf("Packet Count\t: %d\n", pkt_cnt);
-    printf("Smallest\t: %d bytes\n", smallest);
-    printf("Largest\t\t: %d bytes\n", largest);
-    printf("Average\t\t: %.2f bytes\n", tot_size / pkt_cnt);
-
-    printf("\n============= Link Layer =============\n");
-    printf("\n--- Source Ethernet Addresses ---\n\n");
-    print_map(&src_eth_info, 0);
-    printf("\n--- Destination Ethernet Addresses ---\n\n");
-    print_map(&dst_eth_info, 0);
-    printf("\n============= Network Layer =============\n");
-    printf("\n--- Network Layer Protocols ---\n\n");
-    print_map(&nw_prot_info, 0);
-    printf("\n--- Source IP Addresses ---\n\n");
-    print_map(&src_ip_info, 0);
-    printf("\n--- Destination IP Addresses ---\n\n");
-    print_map(&dst_ip_info, 0);
-    printf("\n---------- TTLs ----------\n\n");
-    print_int_map(&ttl_info, 0);
-    printf("\n--- Unique ARP Participants ---\n\n");
-    print_map(&arp_info, 1);
-    printf("\n============= Transport Layer =============\n");
-    printf("\n--- Transport Layer Protocols ---\n\n");
-    print_map(&trns_prot_info, 0);
-    printf("\n========== Transport Layer : TCP ==========\n");
-    printf("\n--- Source TCP Ports ---\n\n");
-    print_int_map(&src_tcp_ports_info, 0);
-    printf("\n--- Destination TCP Ports ---\n\n");
-    print_int_map(&dst_tcp_ports_info, 0);
-    printf("\n---------- TCP Flags ----------\n\n");
-    print_map(&tcp_flag_info, 0);
-    printf("\n---------- TCP Options ----------\n\n");
-    print_map(&tcp_opt_info, 0);
-    printf("\n========== Transport Layer : UDP ==========\n");
-    printf("\n--- Source UDP Ports ---\n\n");
-    print_int_map(&src_udp_ports_info, 0);
-    printf("\n--- Destination UDP Ports ---\n\n");
-    print_int_map(&dst_udp_ports_info, 0);
-    printf("\n========== Transport Layer : ICMP ==========\n");
-    printf("\n--- Source IPs for ICMP ---\n\n");
-    print_map(&icmp_src_ip_info, 0);
-    printf("\n--- Destination IPs for ICMP ---\n\n");
-    print_map(&icmp_dst_ip_info, 0);
-    printf("\n--- ICMP Types ---\n\n");
-    print_int_map(&icmp_type_info, 0);
-    printf("\n--- ICMP Codes ---\n\n");
-    print_int_map(&icmp_code_info, 0);
-    printf("\n--- ICMP Responses ---\n\n");
-    print_map(&icmp_cat_info, 0);
+    // print results stored in lists
+    print_results();
+    // free memory allocated for lists
+    free_lists();
     return 0;
 }
 
@@ -387,7 +330,7 @@ void print_date(struct timeval *ts) {
     nowtm = localtime(&ts->tv_sec);
     strftime(tmbuf, sizeof tmbuf, "%Y-%m-%d %H:%M:%S", nowtm);
     snprintf(buf, sizeof buf, "%s.%06d", tmbuf, (int)ts->tv_usec);
-    printf("Start Date\t: %s\n", buf);
+    printf("  Start Date\t: %s\n", buf);
 }
 
 /* 
@@ -406,7 +349,7 @@ void print_time_diff(struct timeval *start, struct timeval *end) {
     int mins = (diff % usec_per_hr) / (SEC_PER_MIN * USEC_PER_SEC);
     int secs = ((diff % usec_per_hr) % (SEC_PER_MIN * USEC_PER_SEC)) / USEC_PER_SEC;
     int usecs = ((diff % usec_per_hr) % (SEC_PER_MIN * USEC_PER_SEC)) % USEC_PER_SEC; 
-    printf("Duration\t: %.2d:%.2d:%.2d.%.6d\n", hrs, mins, secs, usecs);     
+    printf("  Duration\t: %.2d:%.2d:%.2d.%.6d\n", hrs, mins, secs, usecs);
 }
 
 /*
@@ -606,4 +549,118 @@ void process_icmp_response(int type, int code, char *buf) {
 
 }
 
+// A util function to print all the results stored in lists
+void print_results() {
+    printf("\n\n=============== Summary ===============\n\n");
+    print_date(&start_ts);
+    print_time_diff(&start_ts, &end_ts);
+    printf("  Packet Count\t: %d\n", pkt_cnt);
+    printf("  Smallest\t: %d bytes\n", smallest);
+    printf("  Largest\t: %d bytes\n", largest);
+    printf("  Average\t: %.2f bytes\n", tot_size / pkt_cnt);
 
+    printf("\n============= Link Layer =============\n");
+    printf("\n--- Source Ethernet Addresses ---\n\n");
+    print_map(&src_eth_info, 0);
+    printf("\n--- Destination Ethernet Addresses ---\n\n");
+    print_map(&dst_eth_info, 0);
+    printf("\n============= Network Layer =============\n");
+    printf("\n--- Network Layer Protocols ---\n\n");
+    print_map(&nw_prot_info, 0);
+    printf("\n--- Source IP Addresses ---\n\n");
+    print_map(&src_ip_info, 0);
+    printf("\n--- Destination IP Addresses ---\n\n");
+    print_map(&dst_ip_info, 0);
+    printf("\n---------- TTLs ----------\n\n");
+    print_int_map(&ttl_info, 0);
+    printf("\n--- Unique ARP Participants ---\n\n");
+    print_map(&arp_info, 1);
+    printf("\n============= Transport Layer =============\n");
+    printf("\n--- Transport Layer Protocols ---\n\n");
+    print_map(&trns_prot_info, 0);
+    printf("\n========== Transport Layer : TCP ==========\n");
+    printf("\n--- Source TCP Ports ---\n\n");
+    print_int_map(&src_tcp_ports_info, 0);
+    printf("\n--- Destination TCP Ports ---\n\n");
+    print_int_map(&dst_tcp_ports_info, 0);
+    printf("\n---------- TCP Flags ----------\n\n");
+    print_map(&tcp_flag_info, 0);
+    printf("\n---------- TCP Options ----------\n\n");
+    print_map(&tcp_opt_info, 0);
+    printf("\n========== Transport Layer : UDP ==========\n");
+    printf("\n--- Source UDP Ports ---\n\n");
+    print_int_map(&src_udp_ports_info, 0);
+    printf("\n--- Destination UDP Ports ---\n\n");
+    print_int_map(&dst_udp_ports_info, 0);
+    printf("\n========== Transport Layer : ICMP ==========\n");
+    printf("\n--- Source IPs for ICMP ---\n\n");
+    print_map(&icmp_src_ip_info, 0);
+    printf("\n--- Destination IPs for ICMP ---\n\n");
+    print_map(&icmp_dst_ip_info, 0);
+    printf("\n--- ICMP Types ---\n\n");
+    print_int_map(&icmp_type_info, 0);
+    printf("\n--- ICMP Codes ---\n\n");
+    print_int_map(&icmp_code_info, 0);
+    printf("\n--- ICMP Responses ---\n\n");
+    print_map(&icmp_cat_info, 0);
+    printf("\n\n");
+}
+
+// A util function to initialize all lists used
+void init_lists() {
+    list_init(&src_eth_info.info_map);
+    list_init(&dst_eth_info.info_map);
+    list_init(&nw_prot_info.info_map);
+    list_init(&src_ip_info.info_map);
+    list_init(&dst_ip_info.info_map);
+    list_init(&ttl_info.info_map);
+    list_init(&arp_info.info_map);
+    list_init(&trns_prot_info.info_map);
+    list_init(&src_tcp_ports_info.info_map);
+    list_init(&dst_tcp_ports_info.info_map);
+    list_init(&tcp_flag_info.info_map);
+    list_init(&tcp_opt_info.info_map);
+    list_init(&src_udp_ports_info.info_map);
+    list_init(&dst_udp_ports_info.info_map);
+    list_init(&icmp_src_ip_info.info_map);
+    list_init(&icmp_dst_ip_info.info_map);
+    list_init(&icmp_type_info.info_map);
+    list_init(&icmp_code_info.info_map);
+    list_init(&icmp_cat_info.info_map);
+}
+
+// A util function to free allocated memory for all lists
+void free_lists() {
+    free_list(&src_eth_info.info_map);
+    free_list(&dst_eth_info.info_map);
+    free_list(&nw_prot_info.info_map);
+    free_list(&src_ip_info.info_map);
+    free_list(&dst_ip_info.info_map);
+    free_list(&ttl_info.info_map);
+    free_list(&arp_info.info_map);
+    free_list(&trns_prot_info.info_map);
+    free_list(&src_tcp_ports_info.info_map);
+    free_list(&dst_tcp_ports_info.info_map);
+    free_list(&tcp_flag_info.info_map);
+    free_list(&tcp_opt_info.info_map);
+    free_list(&src_udp_ports_info.info_map);
+    free_list(&dst_udp_ports_info.info_map);
+    free_list(&icmp_src_ip_info.info_map);
+    free_list(&icmp_dst_ip_info.info_map);
+    free_list(&icmp_type_info.info_map);
+    free_list(&icmp_code_info.info_map);
+    free_list(&icmp_cat_info.info_map);
+}
+
+// A util function to free memory allocated for each map item
+void free_list(list_t *list) {
+    node_t *n = list->head;
+    // loop through all nodes
+    while (n != NULL) {
+        // n->val is either a map_item_t or map_item_int_t. we have to free allocated memory
+        free(n->val);
+        // remove the node from the list. this will free memory allocated for node
+        list_remove(list, n);
+        n = n->next;
+    }
+}
