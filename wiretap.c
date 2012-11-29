@@ -168,7 +168,7 @@ void callback_handler(u_char *user, const struct pcap_pkthdr *pcap_hdr, const u_
     add_to_map(&dst_eth_info.info_map, eth_dst_addr);
     dst_eth_info.pkt_count++;
 
-    char nw_prot[10];
+    char nw_prot[18];
     // check ethernet header type and get IP, ARP headers
     if (ntohs(eth_hdr->ether_type) == ETHERTYPE_IP) {
         strcpy(nw_prot, "IP");
@@ -290,8 +290,13 @@ void callback_handler(u_char *user, const struct pcap_pkthdr *pcap_hdr, const u_
         add_to_map(&arp_info.info_map, buf);
         arp_info.pkt_count++;
     } else {
-        // we only have to store the protocol number here
-        sprintf(nw_prot, "%#.4x", ntohs(eth_hdr->ether_type));
+        // 'type' field in ethernet frames can be used for either the protocol or the
+        // length of the packet. If it is for protocol, it should be at least 0x0600
+        if (ntohs(eth_hdr->ether_type) < 0x0600)
+            sprintf(nw_prot, "length = %#.4x", ntohs(eth_hdr->ether_type));
+        else
+            // we only have to store the protocol number here
+            sprintf(nw_prot, "%#.4x", ntohs(eth_hdr->ether_type));
     }
     // add network protocol info into map
     add_to_map(&nw_prot_info.info_map, nw_prot);
