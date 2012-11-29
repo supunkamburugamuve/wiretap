@@ -296,6 +296,8 @@ void callback_handler(u_char *user, const struct pcap_pkthdr *pcap_hdr, const u_
             sprintf(nw_prot, "length = %#.4x", ntohs(eth_hdr->ether_type));
         else
             // we only have to store the protocol number here
+            // (ntohs(eth_hdr->ether_type) == ETHERTYPE_IPV6) case will also come here
+            // it will just be count as a different protocol
             sprintf(nw_prot, "%#.4x", ntohs(eth_hdr->ether_type));
     }
     // add network protocol info into map
