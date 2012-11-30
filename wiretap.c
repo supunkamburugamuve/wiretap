@@ -14,20 +14,35 @@
     read packets and print results at the end.
 */
 
+/* This is the main function that is used as the pcap callback. */
 void callback_handler(u_char *user, const struct pcap_pkthdr *pcap_hdr, const u_char *packet);
+/** Get the ethernet address */
 void get_eth_addr(char *eth_addr, u_char *addr_ptr);
+/* Process the ip header */
 void get_ip_addr(char *ip_addr, u_char *addr_ptr);
+/* utility function for printing date, given a time value */
 void print_date(struct timeval *ts);
+/* utility function for printing the difference in time */
 void print_time_diff(struct timeval *start, struct timeval *end);
+/** add to string map */
 void add_to_map(list_t *list, char *key);
+/** Print a map with string values */
 void print_map(pkt_info_t *info, int tab);
+/** Add to a map an int value */
 void add_to_int_map(list_t *list, int key);
+/* Print a map with integers as values */
 void print_int_map(pkt_info_t *info, int tab);
+/* Utility function for processing tcp flags */
 void process_tcp_flags(char *buf, u_char th_flags);
+/* Utility function for processing the icmp */
 void process_icmp_response(int type, int code, char *buf);
+/* This function prints the results */
 void print_results();
+/* Initialize all the lists */
 void init_lists();
+/* Free the lists */
 void free_lists();
+/* Free a single list by freeing all the nodes and content */
 void free_list(list_t *list);
 
 // set of global variables to summarize packet information
